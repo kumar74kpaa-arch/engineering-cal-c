@@ -230,6 +230,9 @@ export default function EngineeringCalculatorPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="absolute top-0 left-0 w-full p-4 text-center">
+        <h1 className="text-2xl font-bold text-primary">Engineering Cal C</h1>
+      </div>
       <div className="flex-grow flex items-center justify-center w-full">
         <Card className="w-full max-w-sm mx-auto shadow-2xl rounded-3xl overflow-hidden bg-card">
           <CardContent className="p-6">
