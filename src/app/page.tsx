@@ -29,6 +29,30 @@ interface Message {
   mediaUrl?: string;
 }
 
+const Petal = ({ style }: { style: React.CSSProperties }) => <div className="petal" style={style} />;
+
+const LilyIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 100 100" className={cn("absolute opacity-20", className)} fill="hsl(var(--chat-secondary))">
+      <path d="M50,95.42,8.91,62.87a2.5,2.5,0,0,1-.8-3.53L28.3,16.58,50,4.42,71.7,16.58,91.89,59.34a2.5,2.5,0,0,1-.8,3.53Z" />
+      <path d="M50,95.42,8.91,62.87,20.45,51.8,50,75.14,79.55,51.8,91.09,62.87Z" />
+      <path d="M50,4.42,28.3,16.58,35.58,26,50,16.27,64.42,26,71.7,16.58Z" />
+      <path d="M28.3,16.58,8.11,59.34,20.45,51.8Z" />
+      <path d="M71.7,16.58,91.89,59.34,79.55,51.8Z" />
+      <path d="M50,22.19a3.5,3.5,0,1,1-3.5-3.5A3.5,3.5,0,0,1,50,22.19Z" />
+    </svg>
+);
+
+const ChocolateIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M7 21C7 20.4477 7.44772 20 8 20H16C16.5523 20 17 20.4477 17 21C17 21.5523 16.5523 22 16 22H8C7.44772 22 7 21.5523 7 21Z" fill="hsl(var(--chat-accent))"/>
+    <path d="M5 20H19V18C19 16.3431 17.6569 15 16 15H8C6.34315 15 5 16.3431 5 18V20Z" fill="hsl(var(--chat-accent))"/>
+    <path d="M8 15H16V3H8V15Z" fill="hsl(var(--chat-accent))"/>
+    <path d="M8 11H16V13H8V11Z" fill="#f6c1cc"/>
+    <path d="M8 7H16V9H8V7Z" fill="#f6c1cc"/>
+    <path d="M8 3H16V5H8V3Z" fill="#f6c1cc"/>
+  </svg>
+)
+
 export default function EngineeringCalculatorPage() {
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [newMessage, setNewMessage] = useState("");
@@ -39,6 +63,7 @@ export default function EngineeringCalculatorPage() {
   const [recording, setRecording] = useState(false);
   const recordedChunks = useRef<Blob[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [petals, setPetals] = useState<React.ReactNode[]>([]);
 
 
   const [displayValue, setDisplayValue] = useState("0");
@@ -48,6 +73,23 @@ export default function EngineeringCalculatorPage() {
 
   const { auth, firestore, user, isUserLoading, firebaseApp } = useFirebase();
   const storage = firebaseApp ? getStorage(firebaseApp) : null;
+
+  useEffect(() => {
+    if (isChatVisible) {
+      const newPetals = Array.from({ length: 15 }).map((_, i) => {
+        const style = {
+          left: `${Math.random() * 100}vw`,
+          width: `${Math.random() * 20 + 10}px`,
+          height: `${Math.random() * 20 + 10}px`,
+          animationDelay: `${Math.random() * 25}s`,
+          animationDuration: `${Math.random() * 15 + 10}s`,
+        };
+        return <Petal key={i} style={style} />;
+      });
+      setPetals(newPetals);
+    }
+  }, [isChatVisible]);
+
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -122,14 +164,11 @@ export default function EngineeringCalculatorPage() {
 
     try {
       const uploadTask = uploadBytes(fileStorageRef, file);
-      // This is a simplified progress; for real progress, you'd use uploadBytesResumable
-      // For now, we'll just simulate it.
       await new Promise(resolve => setTimeout(resolve, 1000));
       setUploadProgress(50);
       const snapshot = await uploadTask;
       const downloadURL = await getDownloadURL(snapshot.ref);
       setUploadProgress(100);
-
 
       if (messagesCollectionRef) {
           addDocumentNonBlocking(messagesCollectionRef, {
@@ -193,7 +232,6 @@ export default function EngineeringCalculatorPage() {
       }
     }
   };
-
 
   const handleDigit = (digit: string) => {
     if (waitingForSecondOperand) {
@@ -383,14 +421,38 @@ export default function EngineeringCalculatorPage() {
           isChatVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
       >
-        <Card className="w-full max-w-sm h-[90vh] max-h-[700px] flex flex-col shadow-2xl rounded-3xl bg-card">
-          <div className="flex items-center p-4 border-b">
-            <Button variant="ghost" size="icon" onClick={() => setIsChatVisible(false)}>
+        <div className={cn("chat-theme w-full h-full max-w-sm max-h-[700px] absolute overflow-hidden rounded-3xl", isChatVisible ? "" : "pointer-events-none")}>
+          {petals}
+          <LilyIcon className="w-24 h-24 top-4 left-4 transform -translate-x-1/4 -translate-y-1/4" />
+          <LilyIcon className="w-32 h-32 bottom-4 right-4 transform translate-x-1/4 translate-y-1/4 rotate-180" />
+        </div>
+        <Card className={cn("w-full max-w-sm h-[90vh] max-h-[700px] flex flex-col shadow-2xl rounded-3xl bg-transparent transition-all duration-300", isChatVisible ? "chat-theme" : "")}>
+          <div 
+            className="flex items-center p-4 border-b"
+            style={{ borderColor: 'hsl(var(--chat-primary) / 0.5)' }}
+          >
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsChatVisible(false)}
+                className="hover:bg-[hsl(var(--chat-primary)/0.2)] hover:text-[hsl(var(--chat-accent))] transition-colors duration-300"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h2 className="text-xl font-bold mx-auto pr-8">Private Chat</h2>
+            <h2 
+                className="text-xl font-bold mx-auto pr-8"
+                style={{ color: 'hsl(var(--chat-accent))' }}
+            >
+                Private Chat
+            </h2>
           </div>
-          <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
+          <ScrollArea 
+            className="flex-grow p-4" 
+            ref={scrollAreaRef}
+            style={{ 
+              background: 'linear-gradient(to bottom, hsl(var(--chat-bg-start)/0.8), hsl(var(--chat-bg-end)/0.8))'
+            }}
+          >
              {uploadProgress !== null && (
               <div className="p-4">
                   <Progress value={uploadProgress} className="w-full" />
@@ -400,22 +462,40 @@ export default function EngineeringCalculatorPage() {
             <div className="space-y-4">
               {isLoadingMessages && <p>Loading messages...</p>}
               {messages && messages.map((message) => (
-                <div key={message.id} className={cn("flex flex-col space-y-1", user?.uid === message.sender ? "items-end" : "items-start")}>
-                  <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", user?.uid === message.sender ? 'bg-primary text-primary-foreground' : 'bg-secondary')}>
+                <div key={message.id} className={cn("flex flex-col space-y-1 message-enter", user?.uid === message.sender ? "items-end" : "items-start")}>
+                  <div className={cn("rounded-full px-4 py-2 max-w-[80%] shadow-md", 
+                    user?.uid === message.sender 
+                    ? 'text-white' 
+                    : 'text-[hsl(var(--chat-other-bubble-text))]'
+                  )}
+                  style={{
+                    background: user?.uid === message.sender
+                        ? 'linear-gradient(to right, var(--chat-bubble-user-start), var(--chat-bubble-user-end))'
+                        : 'var(--chat-bubble-other)'
+                  }}
+                  >
                     {renderMessageContent(message)}
                   </div>
-                  <span className="text-xs text-muted-foreground pl-1">{formatTimestamp(message.timestamp)}</span>
+                  <span className="text-xs text-muted-foreground pl-1" style={{color: 'hsl(var(--chat-accent)/0.7)'}}>{formatTimestamp(message.timestamp)}</span>
                 </div>
               ))}
             </div>
           </ScrollArea>
-          <div className="p-4 border-t">
+          <div className="p-4 border-t" style={{ borderColor: 'hsl(var(--chat-primary) / 0.5)' }}>
             <div className="flex items-center space-x-2">
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
-              <Button size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={!user}>
+              <Button size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={!user} className="hover:bg-[hsl(var(--chat-primary)/0.2)] hover:text-[hsl(var(--chat-accent))] transition-colors duration-300">
                   <Paperclip className="h-5 w-5" />
               </Button>
-               <Button size="icon" variant="ghost" onClick={handleRecord} disabled={!user} className={cn(recording && "bg-red-500 text-white hover:bg-red-600")}>
+               <Button 
+                size="icon" 
+                variant="ghost" 
+                onClick={handleRecord} 
+                disabled={!user} 
+                className={cn(
+                    "hover:bg-[hsl(var(--chat-primary)/0.2)] hover:text-[hsl(var(--chat-accent))] transition-colors duration-300",
+                    recording && "bg-red-500 text-white hover:bg-red-600"
+                )}>
                   {recording ? <X className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               </Button>
               <Input
@@ -423,14 +503,26 @@ export default function EngineeringCalculatorPage() {
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Type a message..."
-                className="flex-grow"
+                className="flex-grow bg-white/70 focus:bg-white transition-colors duration-300"
+                style={{borderColor: 'hsl(var(--chat-primary))', color: 'hsl(var(--chat-accent))'}}
                 disabled={!user || recording}
               />
-              <Button size="icon" onClick={handleSendMessage} disabled={!user || recording}>
-                <Send className="h-5 w-5" />
+              <Button 
+                size="icon" 
+                onClick={handleSendMessage} 
+                disabled={!user || recording}
+                className="bg-[hsl(var(--chat-accent))] text-white hover:bg-[hsl(var(--chat-accent)/0.8)] transition-colors duration-300 glow-on-hover"
+                >
+                <ChocolateIcon />
               </Button>
             </div>
-            <Button variant="outline" className="w-full mt-2" onClick={handleClearChat} disabled={!user}>
+            <Button 
+                variant="outline" 
+                className="w-full mt-2 bg-transparent hover:bg-[hsl(var(--chat-primary)/0.2)] transition-colors duration-300" 
+                onClick={handleClearChat} 
+                disabled={!user}
+                style={{borderColor: 'hsl(var(--chat-primary))', color: 'hsl(var(--chat-accent))'}}
+            >
               <Trash2 className="mr-2 h-4 w-4" /> Clear History
             </Button>
           </div>

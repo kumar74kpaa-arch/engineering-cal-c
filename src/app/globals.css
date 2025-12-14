@@ -10,7 +10,7 @@
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 0 72% 51%;
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
@@ -22,7 +22,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 222.2 47.4% 11.2%;
+    --ring: 0 72% 51%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -72,6 +72,21 @@
     --sidebar-border: 0 0% 15.9%;
     --sidebar-ring: 0 72% 51%;
   }
+
+  .chat-theme {
+    --chat-bg-start: 347 100% 95%;
+    --chat-bg-end: 283 100% 95%;
+    --chat-primary: 347 72% 86%; /* Soft Blush Pink */
+    --chat-secondary: 283 52% 68%; /* Orchid Purple */
+    --chat-accent: 0 23% 24%; /* Chocolate Brown */
+    --chat-text: 0 23% 14%;
+    --chat-other-bubble: 0 23% 30%;
+    --chat-other-bubble-text: 0 0% 98%;
+
+    --chat-bubble-user-start: hsl(var(--chat-primary));
+    --chat-bubble-user-end: hsl(var(--chat-secondary));
+    --chat-bubble-other: hsl(var(--chat-other-bubble));
+  }
 }
 
 @layer base {
@@ -81,5 +96,37 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .petal {
+    @apply absolute block;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 0 C75 25, 75 75, 50 100 C25 75, 25 25, 50 0 Z" fill="%23f6c1cc" fill-opacity="0.3"/></svg>');
+    background-size: contain;
+    background-repeat: no-repeat;
+    animation: float 25s ease-in-out infinite;
+  }
+
+  .message-enter {
+    animation: message-enter-animation 0.5s ease-out;
+  }
+
+  @keyframes float {
+    0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 0.7; }
+    90% { opacity: 0.7; }
+    100% { transform: translateY(-10vh) rotate(720deg); opacity: 0; }
+  }
+
+  @keyframes message-enter-animation {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 }
