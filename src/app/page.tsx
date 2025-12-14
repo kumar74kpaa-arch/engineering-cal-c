@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, type MouseEvent, ChangeEvent } from "react";
-import { ArrowLeft, Send, Trash2, Paperclip, Mic, X } from "lucide-react";
+import { useState, useRef, useEffect, type MouseEvent } from "react";
+import { ArrowLeft, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,19 +14,15 @@ import {
   addDocumentNonBlocking,
   useMemoFirebase
 } from "@/firebase";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, query, orderBy, serverTimestamp, doc, writeBatch } from "firebase/firestore";
-import { Progress } from "@/components/ui/progress";
 
 type Operator = "+" | "-" | "×" | "÷";
 
 interface Message {
   id: string;
-  text?: string;
+  text: string;
   timestamp: any;
   sender: string;
-  type: 'text' | 'image' | 'video' | 'audio';
-  mediaUrl?: string;
 }
 
 const Petal = ({ style }: { style: React.CSSProperties }) => <div className="petal" style={style} />;
@@ -58,11 +54,6 @@ export default function EngineeringCalculatorPage() {
   const [newMessage, setNewMessage] = useState("");
   const pressStartTime = useRef<number>(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [recording, setRecording] = useState(false);
-  const recordedChunks = useRef<Blob[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [petals, setPetals] = useState<React.ReactNode[]>([]);
 
 
@@ -71,8 +62,7 @@ export default function EngineeringCalculatorPage() {
   const [operator, setOperator] = useState<Operator | null>(null);
   const [waitingForSecondOperand, setWaitingForSecondOperand] = useState(false);
 
-  const { auth, firestore, user, isUserLoading, firebaseApp } = useFirebase();
-  const storage = firebaseApp ? getStorage(firebaseApp) : null;
+  const { auth, firestore, user, isUserLoading } = useFirebase();
 
   useEffect(() => {
     if (isChatVisible) {
@@ -130,7 +120,6 @@ export default function EngineeringCalculatorPage() {
       text: newMessage,
       timestamp: serverTimestamp(),
       sender: user.uid,
-      type: 'text' as const,
     };
     addDocumentNonBlocking(messagesCollectionRef, message);
     setNewMessage("");
@@ -146,91 +135,6 @@ export default function EngineeringCalculatorPage() {
     await batch.commit().catch(error => {
       console.error("Error clearing chat history:", error);
     });
-  };
-
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user || !storage) return;
-
-    const fileType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : null;
-    if (!fileType) {
-      console.error("Unsupported file type");
-      return;
-    }
-    
-    setUploadProgress(0);
-    const storagePath = `chat_media/${user.uid}/${Date.now()}_${file.name}`;
-    const fileStorageRef = storageRef(storage, storagePath);
-
-    try {
-      const uploadTask = uploadBytes(fileStorageRef, file);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUploadProgress(50);
-      const snapshot = await uploadTask;
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      setUploadProgress(100);
-
-      if (messagesCollectionRef) {
-          addDocumentNonBlocking(messagesCollectionRef, {
-              sender: user.uid,
-              timestamp: serverTimestamp(),
-              type: fileType,
-              mediaUrl: downloadURL,
-          });
-      }
-      
-      setTimeout(() => setUploadProgress(null), 1000);
-
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      setUploadProgress(null);
-    }
-};
-
-  const handleRecord = async () => {
-    if (recording) {
-      mediaRecorder?.stop();
-      setRecording(false);
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream);
-        setMediaRecorder(recorder);
-        recorder.ondataavailable = (event) => {
-          recordedChunks.current.push(event.data);
-        };
-        recorder.onstop = async () => {
-          const audioBlob = new Blob(recordedChunks.current, { type: 'audio/webm' });
-          recordedChunks.current = [];
-          if (!user || !storage || !messagesCollectionRef) return;
-
-          setUploadProgress(0);
-          const storagePath = `chat_audio/${user.uid}/${Date.now()}.webm`;
-          const audioStorageRef = storageRef(storage, storagePath);
-          
-          try {
-            await uploadBytes(audioStorageRef, audioBlob);
-            setUploadProgress(50);
-            const downloadURL = await getDownloadURL(audioStorageRef);
-            setUploadProgress(100);
-            addDocumentNonBlocking(messagesCollectionRef, {
-              sender: user.uid,
-              timestamp: serverTimestamp(),
-              type: 'audio',
-              mediaUrl: downloadURL,
-            });
-            setTimeout(() => setUploadProgress(null), 1000);
-          } catch(error) {
-            console.error("Error uploading audio:", error)
-            setUploadProgress(null);
-          }
-        };
-        recorder.start();
-        setRecording(true);
-      } catch (error) {
-        console.error("Error accessing microphone:", error);
-      }
-    }
   };
 
   const handleDigit = (digit: string) => {
@@ -367,18 +271,7 @@ export default function EngineeringCalculatorPage() {
   }
 
   const renderMessageContent = (message: Message) => {
-    switch (message.type) {
-        case 'text':
-            return <p className="text-sm">{message.text}</p>;
-        case 'image':
-            return <img src={message.mediaUrl} alt="Sent Image" className="rounded-lg max-w-full h-auto" />;
-        case 'video':
-            return <video src={message.mediaUrl} controls className="rounded-lg max-w-full h-auto" />;
-        case 'audio':
-            return <audio src={message.mediaUrl} controls className="w-full" />;
-        default:
-            return null;
-    }
+    return <p className="text-sm">{message.text}</p>;
   };
 
   return (
@@ -453,12 +346,6 @@ export default function EngineeringCalculatorPage() {
               background: 'linear-gradient(to bottom, hsl(var(--chat-bg-start)/0.8), hsl(var(--chat-bg-end)/0.8))'
             }}
           >
-             {uploadProgress !== null && (
-              <div className="p-4">
-                  <Progress value={uploadProgress} className="w-full" />
-                  <p className="text-sm text-center mt-1">{uploadProgress}% uploaded</p>
-              </div>
-            )}
             <div className="space-y-4">
               {isLoadingMessages && <p>Loading messages...</p>}
               {messages && messages.map((message) => (
@@ -483,21 +370,6 @@ export default function EngineeringCalculatorPage() {
           </ScrollArea>
           <div className="p-4 border-t z-10" style={{ borderColor: 'hsl(var(--chat-primary) / 0.5)' }}>
             <div className="flex items-center space-x-2">
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
-              <Button size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={!user} className="hover:bg-[hsl(var(--chat-primary)/0.2)] hover:text-[hsl(var(--chat-accent))] transition-colors duration-300">
-                  <Paperclip className="h-5 w-5" />
-              </Button>
-               <Button 
-                size="icon" 
-                variant="ghost" 
-                onClick={handleRecord} 
-                disabled={!user} 
-                className={cn(
-                    "hover:bg-[hsl(var(--chat-primary)/0.2)] hover:text-[hsl(var(--chat-accent))] transition-colors duration-300",
-                    recording && "bg-red-500 text-white hover:bg-red-600"
-                )}>
-                  {recording ? <X className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-              </Button>
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
@@ -505,12 +377,12 @@ export default function EngineeringCalculatorPage() {
                 placeholder="Type a message..."
                 className="flex-grow bg-white/70 focus:bg-white transition-colors duration-300"
                 style={{borderColor: 'hsl(var(--chat-primary))', color: 'hsl(var(--chat-accent))'}}
-                disabled={!user || recording}
+                disabled={!user}
               />
               <Button 
                 size="icon" 
                 onClick={handleSendMessage} 
-                disabled={!user || recording}
+                disabled={!user}
                 className="bg-[hsl(var(--chat-accent))] text-white hover:bg-[hsl(var(--chat-accent)/0.8)] transition-colors duration-300 glow-on-hover"
                 >
                 <ChocolateIcon />
