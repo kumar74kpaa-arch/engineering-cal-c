@@ -2,24 +2,32 @@
 
 import { useState, useRef, useEffect, type MouseEvent } from "react";
 import { ArrowLeft, Send, Trash2 } from "lucide-react";
-import { useLocalStorage } from "@/hooks/use-local-storage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { 
+  useFirebase, 
+  useCollection, 
+  initiateAnonymousSignIn,
+  addDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+  useMemoFirebase
+} from "@/firebase";
+import { collection, query, orderBy, serverTimestamp, doc, writeBatch } from "firebase/firestore";
 
 type Operator = "+" | "-" | "×" | "÷";
 
 interface Message {
-  id: number;
+  id: string;
   text: string;
-  timestamp: string;
+  timestamp: any;
+  sender: string;
 }
 
 export default function EngineeringCalculatorPage() {
   const [isChatVisible, setIsChatVisible] = useState(false);
-  const [messages, setMessages] = useLocalStorage<Message[]>("chatMessages", []);
   const [newMessage, setNewMessage] = useState("");
   const pressStartTime = useRef<number>(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -28,6 +36,26 @@ export default function EngineeringCalculatorPage() {
   const [firstOperand, setFirstOperand] = useState<number | null>(null);
   const [operator, setOperator] = useState<Operator | null>(null);
   const [waitingForSecondOperand, setWaitingForSecondOperand] = useState(false);
+
+  const { auth, firestore, user, isUserLoading } = useFirebase();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [isUserLoading, user, auth]);
+
+  const messagesCollectionRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'chat_messages');
+  }, [firestore]);
+
+  const messagesQuery = useMemoFirebase(() => {
+    if (!messagesCollectionRef) return null;
+    return query(messagesCollectionRef, orderBy("timestamp", "asc"));
+  }, [messagesCollectionRef]);
+  
+  const { data: messages, isLoading: isLoadingMessages } = useCollection<Omit<Message, 'id'>>(messagesQuery);
 
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
@@ -45,18 +73,26 @@ export default function EngineeringCalculatorPage() {
   }, [isChatVisible, messages]);
 
   const handleSendMessage = () => {
-    if (newMessage.trim() === "") return;
-    const message: Message = {
-      id: Date.now(),
+    if (newMessage.trim() === "" || !user || !messagesCollectionRef) return;
+    const message = {
       text: newMessage,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: serverTimestamp(),
+      sender: user.uid,
     };
-    setMessages([...messages, message]);
+    addDocumentNonBlocking(messagesCollectionRef, message);
     setNewMessage("");
   };
 
-  const handleClearChat = () => {
-    setMessages([]);
+  const handleClearChat = async () => {
+    if (!firestore || !messages || messages.length === 0) return;
+    const batch = writeBatch(firestore);
+    messages.forEach(message => {
+      const docRef = doc(firestore, "chat_messages", message.id);
+      batch.delete(docRef);
+    });
+    await batch.commit().catch(error => {
+      console.error("Error clearing chat history:", error);
+    });
   };
 
   const handleDigit = (digit: string) => {
@@ -184,20 +220,28 @@ export default function EngineeringCalculatorPage() {
     { label: "+", handler: () => handleOperator("+"), variant: 'primary' as const },
   ];
 
+  const formatTimestamp = (timestamp: any) => {
+    if (!timestamp) return "";
+    if (timestamp.toDate) {
+      return timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm mx-auto shadow-2xl rounded-3xl overflow-hidden">
+      <Card className="w-full max-w-sm mx-auto shadow-2xl rounded-3xl overflow-hidden bg-card">
         <CardContent className="p-6">
           <div className="bg-muted text-right p-4 rounded-xl mb-6 shadow-inner">
             <p className="text-5xl font-light text-muted-foreground break-all" style={{ minHeight: '3.75rem' }}>{displayValue}</p>
           </div>
           <div className="grid grid-cols-4 grid-rows-4 gap-4">
+            <CalculatorButton onClick={handleClear} variant='destructive' className="bg-accent text-accent-foreground">C</CalculatorButton>
             {calculatorButtons.slice(1).map((btn) => (
               <CalculatorButton key={btn.label} onClick={btn.handler} variant={btn.variant}>
                 {btn.label}
               </CalculatorButton>
             ))}
-             <CalculatorButton onClick={handleClear} variant='destructive' className="bg-accent text-accent-foreground">C</CalculatorButton>
           </div>
           <div className="mt-4">
             <CalculatorButton
@@ -219,7 +263,7 @@ export default function EngineeringCalculatorPage() {
           isChatVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
       >
-        <Card className="w-full max-w-sm h-[90vh] max-h-[700px] flex flex-col shadow-2xl rounded-3xl">
+        <Card className="w-full max-w-sm h-[90vh] max-h-[700px] flex flex-col shadow-2xl rounded-3xl bg-card">
           <div className="flex items-center p-4 border-b">
             <Button variant="ghost" size="icon" onClick={() => setIsChatVisible(false)}>
               <ArrowLeft className="h-5 w-5" />
@@ -228,12 +272,13 @@ export default function EngineeringCalculatorPage() {
           </div>
           <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
             <div className="space-y-4">
-              {messages.map((message) => (
-                <div key={message.id} className="flex flex-col items-start space-y-1">
-                  <div className="rounded-lg bg-secondary px-4 py-2 max-w-[80%]">
+              {isLoadingMessages && <p>Loading messages...</p>}
+              {messages && messages.map((message) => (
+                <div key={message.id} className={cn("flex flex-col space-y-1", user?.uid === message.sender ? "items-end" : "items-start")}>
+                  <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", user?.uid === message.sender ? 'bg-primary text-primary-foreground' : 'bg-secondary')}>
                     <p className="text-sm">{message.text}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground pl-1">{message.timestamp}</span>
+                  <span className="text-xs text-muted-foreground pl-1">{formatTimestamp(message.timestamp)}</span>
                 </div>
               ))}
             </div>
@@ -246,12 +291,13 @@ export default function EngineeringCalculatorPage() {
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Type a message..."
                 className="flex-grow"
+                disabled={!user}
               />
-              <Button size="icon" onClick={handleSendMessage}>
+              <Button size="icon" onClick={handleSendMessage} disabled={!user}>
                 <Send className="h-5 w-5" />
               </Button>
             </div>
-            <Button variant="outline" className="w-full mt-2" onClick={handleClearChat}>
+            <Button variant="outline" className="w-full mt-2" onClick={handleClearChat} disabled={!user}>
               <Trash2 className="mr-2 h-4 w-4" /> Clear History
             </Button>
           </div>
