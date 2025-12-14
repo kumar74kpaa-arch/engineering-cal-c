@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'Engineering Calculator',
+  title: 'Engineering Cal C',
   description: 'A standard calculator with a hidden chat interface.',
 };
 
