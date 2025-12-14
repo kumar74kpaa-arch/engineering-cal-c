@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, type MouseEvent } from "react";
-import { ArrowLeft, Send, Trash2 } from "lucide-react";
+import { useState, useRef, useEffect, type MouseEvent, ChangeEvent } from "react";
+import { ArrowLeft, Send, Trash2, Paperclip, Mic, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,18 +12,21 @@ import {
   useCollection, 
   initiateAnonymousSignIn,
   addDocumentNonBlocking,
-  deleteDocumentNonBlocking,
   useMemoFirebase
 } from "@/firebase";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, query, orderBy, serverTimestamp, doc, writeBatch } from "firebase/firestore";
+import { Progress } from "@/components/ui/progress";
 
 type Operator = "+" | "-" | "×" | "÷";
 
 interface Message {
   id: string;
-  text: string;
+  text?: string;
   timestamp: any;
   sender: string;
+  type: 'text' | 'image' | 'video' | 'audio';
+  mediaUrl?: string;
 }
 
 export default function EngineeringCalculatorPage() {
@@ -31,13 +34,20 @@ export default function EngineeringCalculatorPage() {
   const [newMessage, setNewMessage] = useState("");
   const pressStartTime = useRef<number>(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recording, setRecording] = useState(false);
+  const recordedChunks = useRef<Blob[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
 
   const [displayValue, setDisplayValue] = useState("0");
   const [firstOperand, setFirstOperand] = useState<number | null>(null);
   const [operator, setOperator] = useState<Operator | null>(null);
   const [waitingForSecondOperand, setWaitingForSecondOperand] = useState(false);
 
-  const { auth, firestore, user, isUserLoading } = useFirebase();
+  const { auth, firestore, user, isUserLoading, firebaseApp } = useFirebase();
+  const storage = firebaseApp ? getStorage(firebaseApp) : null;
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -78,6 +88,7 @@ export default function EngineeringCalculatorPage() {
       text: newMessage,
       timestamp: serverTimestamp(),
       sender: user.uid,
+      type: 'text' as const,
     };
     addDocumentNonBlocking(messagesCollectionRef, message);
     setNewMessage("");
@@ -94,6 +105,95 @@ export default function EngineeringCalculatorPage() {
       console.error("Error clearing chat history:", error);
     });
   };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user || !storage) return;
+
+    const fileType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : null;
+    if (!fileType) {
+      console.error("Unsupported file type");
+      return;
+    }
+    
+    setUploadProgress(0);
+    const storagePath = `chat_media/${user.uid}/${Date.now()}_${file.name}`;
+    const fileStorageRef = storageRef(storage, storagePath);
+
+    try {
+      const uploadTask = uploadBytes(fileStorageRef, file);
+      // This is a simplified progress; for real progress, you'd use uploadBytesResumable
+      // For now, we'll just simulate it.
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setUploadProgress(50);
+      const snapshot = await uploadTask;
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      setUploadProgress(100);
+
+
+      if (messagesCollectionRef) {
+          addDocumentNonBlocking(messagesCollectionRef, {
+              sender: user.uid,
+              timestamp: serverTimestamp(),
+              type: fileType,
+              mediaUrl: downloadURL,
+          });
+      }
+      
+      setTimeout(() => setUploadProgress(null), 1000);
+
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      setUploadProgress(null);
+    }
+};
+
+  const handleRecord = async () => {
+    if (recording) {
+      mediaRecorder?.stop();
+      setRecording(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        setMediaRecorder(recorder);
+        recorder.ondataavailable = (event) => {
+          recordedChunks.current.push(event.data);
+        };
+        recorder.onstop = async () => {
+          const audioBlob = new Blob(recordedChunks.current, { type: 'audio/webm' });
+          recordedChunks.current = [];
+          if (!user || !storage || !messagesCollectionRef) return;
+
+          setUploadProgress(0);
+          const storagePath = `chat_audio/${user.uid}/${Date.now()}.webm`;
+          const audioStorageRef = storageRef(storage, storagePath);
+          
+          try {
+            await uploadBytes(audioStorageRef, audioBlob);
+            setUploadProgress(50);
+            const downloadURL = await getDownloadURL(audioStorageRef);
+            setUploadProgress(100);
+            addDocumentNonBlocking(messagesCollectionRef, {
+              sender: user.uid,
+              timestamp: serverTimestamp(),
+              type: 'audio',
+              mediaUrl: downloadURL,
+            });
+            setTimeout(() => setUploadProgress(null), 1000);
+          } catch(error) {
+            console.error("Error uploading audio:", error)
+            setUploadProgress(null);
+          }
+        };
+        recorder.start();
+        setRecording(true);
+      } catch (error) {
+        console.error("Error accessing microphone:", error);
+      }
+    }
+  };
+
 
   const handleDigit = (digit: string) => {
     if (waitingForSecondOperand) {
@@ -202,7 +302,7 @@ export default function EngineeringCalculatorPage() {
   );
 
   const calculatorButtons = [
-    { label: "C", handler: handleClear, variant: 'destructive' as const, className: 'bg-accent text-accent-foreground' },
+    { label: "C", handler: handleClear, variant: 'destructive' as const, className: 'bg-red-500 hover:bg-red-600 text-white' },
     { label: "7", handler: () => handleDigit("7") },
     { label: "8", handler: () => handleDigit("8") },
     { label: "9", handler: () => handleDigit("9") },
@@ -228,6 +328,21 @@ export default function EngineeringCalculatorPage() {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
+  const renderMessageContent = (message: Message) => {
+    switch (message.type) {
+        case 'text':
+            return <p className="text-sm">{message.text}</p>;
+        case 'image':
+            return <img src={message.mediaUrl} alt="Sent Image" className="rounded-lg max-w-full h-auto" />;
+        case 'video':
+            return <video src={message.mediaUrl} controls className="rounded-lg max-w-full h-auto" />;
+        case 'audio':
+            return <audio src={message.mediaUrl} controls className="w-full" />;
+        default:
+            return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="absolute top-0 left-0 w-full p-4 text-center">
@@ -240,7 +355,7 @@ export default function EngineeringCalculatorPage() {
               <p className="text-5xl font-light text-muted-foreground break-all" style={{ minHeight: '3.75rem' }}>{displayValue}</p>
             </div>
             <div className="grid grid-cols-4 grid-rows-4 gap-4">
-              <CalculatorButton onClick={handleClear} variant='destructive' className="bg-accent text-accent-foreground">C</CalculatorButton>
+               <CalculatorButton onClick={handleClear} variant='destructive' className="bg-red-500 hover:bg-red-600 text-white">C</CalculatorButton>
               {calculatorButtons.slice(1).map((btn) => (
                 <CalculatorButton key={btn.label} onClick={btn.handler} variant={btn.variant}>
                   {btn.label}
@@ -276,12 +391,18 @@ export default function EngineeringCalculatorPage() {
             <h2 className="text-xl font-bold mx-auto pr-8">Private Chat</h2>
           </div>
           <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
+             {uploadProgress !== null && (
+              <div className="p-4">
+                  <Progress value={uploadProgress} className="w-full" />
+                  <p className="text-sm text-center mt-1">{uploadProgress}% uploaded</p>
+              </div>
+            )}
             <div className="space-y-4">
               {isLoadingMessages && <p>Loading messages...</p>}
               {messages && messages.map((message) => (
                 <div key={message.id} className={cn("flex flex-col space-y-1", user?.uid === message.sender ? "items-end" : "items-start")}>
                   <div className={cn("rounded-lg px-4 py-2 max-w-[80%]", user?.uid === message.sender ? 'bg-primary text-primary-foreground' : 'bg-secondary')}>
-                    <p className="text-sm">{message.text}</p>
+                    {renderMessageContent(message)}
                   </div>
                   <span className="text-xs text-muted-foreground pl-1">{formatTimestamp(message.timestamp)}</span>
                 </div>
@@ -290,15 +411,22 @@ export default function EngineeringCalculatorPage() {
           </ScrollArea>
           <div className="p-4 border-t">
             <div className="flex items-center space-x-2">
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
+              <Button size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={!user}>
+                  <Paperclip className="h-5 w-5" />
+              </Button>
+               <Button size="icon" variant="ghost" onClick={handleRecord} disabled={!user} className={cn(recording && "bg-red-500 text-white hover:bg-red-600")}>
+                  {recording ? <X className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              </Button>
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                 placeholder="Type a message..."
                 className="flex-grow"
-                disabled={!user}
+                disabled={!user || recording}
               />
-              <Button size="icon" onClick={handleSendMessage} disabled={!user}>
+              <Button size="icon" onClick={handleSendMessage} disabled={!user || recording}>
                 <Send className="h-5 w-5" />
               </Button>
             </div>

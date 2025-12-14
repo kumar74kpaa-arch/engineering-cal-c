@@ -21,14 +21,23 @@
         },
         "content": {
           "type": "string",
-          "description": "The actual text content of the message."
+          "description": "The actual text content of the message. This can be null for media messages."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of message.",
+          "enum": ["text", "image", "video", "audio"]
+        },
+        "mediaUrl": {
+          "type": "string",
+          "description": "The URL to the uploaded media file in Firebase Storage."
         }
       },
       "required": [
         "id",
         "timestamp",
         "sender",
-        "content"
+        "type"
       ]
     }
   },
