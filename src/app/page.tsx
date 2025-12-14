@@ -229,32 +229,34 @@ export default function EngineeringCalculatorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm mx-auto shadow-2xl rounded-3xl overflow-hidden bg-card">
-        <CardContent className="p-6">
-          <div className="bg-muted text-right p-4 rounded-xl mb-6 shadow-inner">
-            <p className="text-5xl font-light text-muted-foreground break-all" style={{ minHeight: '3.75rem' }}>{displayValue}</p>
-          </div>
-          <div className="grid grid-cols-4 grid-rows-4 gap-4">
-            <CalculatorButton onClick={handleClear} variant='destructive' className="bg-accent text-accent-foreground">C</CalculatorButton>
-            {calculatorButtons.slice(1).map((btn) => (
-              <CalculatorButton key={btn.label} onClick={btn.handler} variant={btn.variant}>
-                {btn.label}
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="flex-grow flex items-center justify-center w-full">
+        <Card className="w-full max-w-sm mx-auto shadow-2xl rounded-3xl overflow-hidden bg-card">
+          <CardContent className="p-6">
+            <div className="bg-muted text-right p-4 rounded-xl mb-6 shadow-inner">
+              <p className="text-5xl font-light text-muted-foreground break-all" style={{ minHeight: '3.75rem' }}>{displayValue}</p>
+            </div>
+            <div className="grid grid-cols-4 grid-rows-4 gap-4">
+              <CalculatorButton onClick={handleClear} variant='destructive' className="bg-accent text-accent-foreground">C</CalculatorButton>
+              {calculatorButtons.slice(1).map((btn) => (
+                <CalculatorButton key={btn.label} onClick={btn.handler} variant={btn.variant}>
+                  {btn.label}
+                </CalculatorButton>
+              ))}
+            </div>
+            <div className="mt-4">
+              <CalculatorButton
+                onMouseDown={handleEqualsMouseDown}
+                onMouseUp={handleEqualsMouseUp}
+                variant="primary"
+                className="w-full"
+              >
+                =
               </CalculatorButton>
-            ))}
-          </div>
-          <div className="mt-4">
-            <CalculatorButton
-              onMouseDown={handleEqualsMouseDown}
-              onMouseUp={handleEqualsMouseUp}
-              variant="primary"
-              className="w-full"
-            >
-              =
-            </CalculatorButton>
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
       
       {/* Chat Interface */}
       <div
@@ -302,6 +304,9 @@ export default function EngineeringCalculatorPage() {
             </Button>
           </div>
         </Card>
+      </div>
+      <div className="w-full text-center py-4">
+        <p className="text-sm text-muted-foreground">Made by KumarTechnologies</p>
       </div>
     </div>
   );
