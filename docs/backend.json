@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single message within the hidden chat interface of the calculator app.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ChatMessage entity."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp indicating when the message was sent.",
+          "format": "date-time"
+        },
+        "sender": {
+          "type": "string",
+          "description": "Identifier of the user who sent the message. In this single user instance, can be a fixed value such as 'user'."
+        },
+        "content": {
+          "type": "string",
+          "description": "The actual text content of the message."
+        }
+      },
+      "required": [
+        "id",
+        "timestamp",
+        "sender",
+        "content"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/chat_messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores chat messages for the hidden chat interface.",
+          "params": [
+            {
+              "name": "messageId",
+              "description": "Unique identifier for the chat message."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "Given the application's requirement for a hidden chat interface with ephemeral data, the proposed Firestore structure focuses on simplicity and security, even though the data itself is not intended for long-term persistence (localStorage is used for that). Since the application is a single-user instance, we can avoid complex authorization and focus on a structure that is easy to reason about. \n\nThe chat messages are stored in a collection called `chat_messages`. The structure is designed to be straightforward, focusing on the core functionality: storing and retrieving chat messages. Even though the data is considered ephemeral, Firestore is used as the system of record to improve debuggability. If a user experiences an issue, the message history can be analyzed on the backend. In the long term, this could be useful for customer service or abuse monitoring.\n\n**Authorization Independence:** There is no authorization independence to consider, as this is a single-user application and data is ephemeral. Therefore, there are no `get()` operations in security rules, and atomic operations are not a concern. The security rules simply check that the user is authenticated.\n\n**QAPs (Rules are not Filters):**  Given that there are no access control concerns and the data is considered ephemeral, `list` operations are not a security concern. The rules can be written to simply allow authenticated access."
+  }
+}

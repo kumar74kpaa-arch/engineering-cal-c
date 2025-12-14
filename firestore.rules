@@ -1,0 +1,58 @@
+/**
+ * Core Philosophy: This ruleset provides a simple, authenticated-only access model
+ * for a single-user chat application. The primary security goal is to ensure that
+ * only authenticated users (including anonymous users) can interact with the chat
+ * data, preventing any public, unauthenticated access. There is no concept of
+ * message ownership; any signed-in user can read, create, update, or delete any message.
+ *
+ * Data Structure: All chat messages are stored in a single, top-level collection
+ * named /chat_messages.
+ *
+ * Key Security Decisions:
+ * - Authenticated-Only Access: All operations (read, write, delete) are gated by a
+ *   check to ensure the user is signed in. Anonymous users are considered
+ *   authenticated.
+ * - No Ownership Model: Since this is designed for a single-user instance, the
+ *   rules do not enforce that a user can only modify their own messages. Any
+ *   authenticated user has full control over the entire collection.
+ * - Full Listing Allowed: Authenticated users are permitted to list all messages
+ *   in the collection, which is suitable for the application's chat interface.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions
+
+    /**
+     * Checks if a user is authenticated.
+     * This includes password-based and anonymous users.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if a user is signed in and the document they are trying to
+     * modify or delete actually exists.
+     */
+    function canAccessExisting() {
+      return isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Allows any authenticated user to read, create, update, and delete any chat message.
+     * @path /chat_messages/{messageId}
+     * @allow An authenticated user (auth.uid: 'user123') can (create) a new message at /chat_messages/msg_abc.
+     * @deny A user who is not signed in (request.auth is null) tries to (get) a message.
+     * @principle Enforces that only authenticated users can access the chat system, without imposing any ownership restrictions.
+     */
+    match /chat_messages/{messageId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if canAccessExisting();
+      allow delete: if canAccessExisting();
+    }
+  }
+}
