@@ -98,9 +98,9 @@ export default function EngineeringCalculatorPage() {
   }, [isUserLoading, user, auth]);
 
   const messagesCollectionRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return collection(firestore, 'chat_messages');
-  }, [firestore]);
+  }, [firestore, user]);
 
   const messagesQuery = useMemoFirebase(() => {
     if (!messagesCollectionRef) return null;
@@ -428,7 +428,7 @@ export default function EngineeringCalculatorPage() {
         </div>
         <Card className={cn("z-10 w-full max-w-sm h-[90vh] max-h-[700px] flex flex-col shadow-2xl rounded-3xl bg-transparent transition-all duration-300", isChatVisible ? "chat-theme" : "")}>
           <div 
-            className="flex items-center p-4 border-b"
+            className="flex items-center p-4 border-b z-10"
             style={{ borderColor: 'hsl(var(--chat-primary) / 0.5)' }}
           >
             <Button 
@@ -481,7 +481,7 @@ export default function EngineeringCalculatorPage() {
               ))}
             </div>
           </ScrollArea>
-          <div className="p-4 border-t" style={{ borderColor: 'hsl(var(--chat-primary) / 0.5)' }}>
+          <div className="p-4 border-t z-10" style={{ borderColor: 'hsl(var(--chat-primary) / 0.5)' }}>
             <div className="flex items-center space-x-2">
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
               <Button size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={!user} className="hover:bg-[hsl(var(--chat-primary)/0.2)] hover:text-[hsl(var(--chat-accent))] transition-colors duration-300">
