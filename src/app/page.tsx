@@ -426,7 +426,7 @@ export default function EngineeringCalculatorPage() {
           <LilyIcon className="w-24 h-24 top-4 left-4 transform -translate-x-1/4 -translate-y-1/4" />
           <LilyIcon className="w-32 h-32 bottom-4 right-4 transform translate-x-1/4 translate-y-1/4 rotate-180" />
         </div>
-        <Card className={cn("w-full max-w-sm h-[90vh] max-h-[700px] flex flex-col shadow-2xl rounded-3xl bg-transparent transition-all duration-300", isChatVisible ? "chat-theme" : "")}>
+        <Card className={cn("z-10 w-full max-w-sm h-[90vh] max-h-[700px] flex flex-col shadow-2xl rounded-3xl bg-transparent transition-all duration-300", isChatVisible ? "chat-theme" : "")}>
           <div 
             className="flex items-center p-4 border-b"
             style={{ borderColor: 'hsl(var(--chat-primary) / 0.5)' }}
